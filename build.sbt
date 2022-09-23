@@ -14,7 +14,7 @@ val V = new {
 
 lazy val root = (project in file("."))
   .settings(
-    name := "dir-stat-exporter",
+    name := "dir-stats-exporter",
 
     libraryDependencies ++= Seq(
       "de.lolhens" %% "scala-trustmanager-utils" % V.trustmanagerUtils,
