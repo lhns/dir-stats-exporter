@@ -72,8 +72,8 @@ object DirStatsMetricData {
       resource,
       instrumentationScopeInfo,
       name,
-      description.orNull,
-      unit.orNull,
+      description.getOrElse(""),
+      unit.getOrElse(""),
       ImmutableGaugeData.create(
         util.Arrays.asList(
           ImmutableLongPointData.create(
