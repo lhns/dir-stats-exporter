@@ -25,6 +25,8 @@ class DirectoryObserver(
           )
           .map { file =>
             Stream.eval(Files[IO].getBasicFileAttributes(file))
+              .attempt
+              .flatMap(e => Stream.fromOption(e.toOption))
               .filter(_.isRegularFile)
               .map { attributes =>
                 DirStats.single(
@@ -45,7 +47,8 @@ class DirectoryObserver(
 
   def observe(interval: FiniteDuration): Stream[IO, DirStats] =
     Stream.fixedRateStartImmediately[IO](interval)
-      .evalMap(_ => scan)
+      .evalMap(_ => scan.attempt)
+      .flatMap(e => Stream.fromOption(e.toOption))
 }
 
 object DirectoryObserver {
