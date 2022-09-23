@@ -25,18 +25,15 @@ object Main extends IOApp {
       _ <- Resource.eval {
         Stream.emits(config.directories)
           .map { directory =>
-            new DirectoryObserver(
-              path = directory.path,
-              includeHidden = directory.includeHiddenOrDefault
-            )
+            new DirectoryObserver(path = directory.path)
               .observe(directory.interval.getOrElse(config.defaultInterval))
               .map(dirStats => (directory, dirStats))
           }
           .parJoinUnbounded
           .flatMap {
-            case (directory, dirStats) =>
-              Stream.emits(
-                dirStatsMetricData.toMetricData(dirStats, directory.path, directory.tagsOrDefault)
+            case (directory, dirStatsCollection) =>
+              Stream.iterable(
+                dirStatsMetricData.toMetricData(dirStatsCollection, directory.path, directory.tagsOrDefault)
               )
           }
           .groupWithin(8192, 10.seconds)

@@ -22,12 +22,9 @@ object Config {
   case class DirConfig(
                         path: Path,
                         //TODO: recursive: Boolean = false,
-                        includeHidden: Option[Boolean],
                         interval: Option[FiniteDuration],
                         tags: Option[Map[String, String]]
                       ) {
-    val includeHiddenOrDefault: Boolean = includeHidden.getOrElse(false)
-
     val tagsOrDefault: Map[String, String] = tags.getOrElse(Map.empty)
   }
 
