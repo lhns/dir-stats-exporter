@@ -21,7 +21,7 @@ object Main extends IOApp {
   private def applicationResource(config: Config): Resource[IO, Unit] =
     for {
       metricExporter <- makeMetricExporter(config.endpoint)
-      counters = new DirStatsMetricData(config.prefixOrDefault)
+      dirStatsMetricData = new DirStatsMetricData(config.prefixOrDefault)
       _ <- Resource.eval {
         Stream.emits(config.directories)
           .map { directory =>
@@ -36,7 +36,7 @@ object Main extends IOApp {
           .flatMap {
             case (directory, dirStats) =>
               Stream.emits(
-                counters.toMetricData(dirStats, directory.path, directory.tagsOrDefault)
+                dirStatsMetricData.toMetricData(dirStats, directory.path, directory.tagsOrDefault)
               )
           }
           .groupWithin(8192, 10.seconds)
