@@ -1,33 +1,27 @@
 package de.lhns.exporter.dir
 
 import cats.effect.{ExitCode, IO, IOApp, Resource}
-import de.lhns.exporter.dir.DirectoryObserver.DirStats.DirStatsCounters
 import fs2.Stream
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
-import io.opentelemetry.sdk.metrics.SdkMeterProvider
-import io.opentelemetry.sdk.metrics.`export`.PeriodicMetricReader
+import io.opentelemetry.sdk.metrics.`export`.MetricExporter
+
+import scala.concurrent.duration._
+import scala.jdk.CollectionConverters._
 
 object Main extends IOApp {
   override def run(args: List[String]): IO[ExitCode] =
     applicationResource(Config.fromEnv).use(_ => IO.never)
 
-  def meterProviderResource(endpoint: String): Resource[IO, SdkMeterProvider] = Resource.liftK(IO {
-    SdkMeterProvider.builder()
-      .registerMetricReader(
-        PeriodicMetricReader.builder(
-          OtlpGrpcMetricExporter.builder()
-            .setEndpoint(endpoint)
-            .build()
-        ).build()
-      )
+  def makeMetricExporter(endpoint: String): Resource[IO, MetricExporter] = Resource.liftK(IO {
+    OtlpGrpcMetricExporter.builder()
+      .setEndpoint(endpoint)
       .build()
   })
 
   private def applicationResource(config: Config): Resource[IO, Unit] =
     for {
-      meterProvider <- meterProviderResource(config.endpoint)
-      meter = meterProvider.get("dir-stats-exporter")
-      counters = new DirStatsCounters(meter, config.prefixOrDefault)
+      metricExporter <- makeMetricExporter(config.endpoint)
+      counters = new DirStatsMetricData(config.prefixOrDefault)
       _ <- Resource.eval {
         Stream.emits(config.directories)
           .map { directory =>
@@ -39,9 +33,15 @@ object Main extends IOApp {
               .map(dirStats => (directory, dirStats))
           }
           .parJoinUnbounded
-          .map {
+          .flatMap {
             case (directory, dirStats) =>
-              counters.add(dirStats, directory.path, directory.tagsOrDefault)
+              Stream.emits(
+                counters.toMetricData(dirStats, directory.path, directory.tagsOrDefault)
+              )
+          }
+          .groupWithin(8192, 10.seconds)
+          .map { metricDataChunk =>
+            metricExporter.`export`(metricDataChunk.toList.asJavaCollection)
           }
           .compile
           .drain

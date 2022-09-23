@@ -6,8 +6,6 @@ import de.lhns.exporter.dir.DirectoryObserver.DirStats
 import de.lhns.exporter.dir.DirectoryObserver.DirStats.FileStats
 import fs2.Stream
 import fs2.io.file.{Files, Path}
-import io.opentelemetry.api.common.Attributes
-import io.opentelemetry.api.metrics.Meter
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
@@ -29,15 +27,12 @@ class DirectoryObserver(
             Stream.eval(Files[IO].getBasicFileAttributes(file))
               .filter(_.isRegularFile)
               .map { attributes =>
-                val fileStats = FileStats(
-                  modified = Instant.ofEpochMilli(attributes.lastModifiedTime.toMillis),
-                  size = attributes.size
-                )
-                DirStats(
-                  oldest = Some(fileStats),
-                  newest = Some(fileStats),
-                  size = fileStats.size,
-                  countEmpty = if (fileStats.size == 0) 1 else 0
+                DirStats.single(
+                  now = Instant.now(),
+                  fileStats = FileStats(
+                    modified = Instant.ofEpochMilli(attributes.lastModifiedTime.toMillis),
+                    size = attributes.size
+                  )
                 )
               }
           }
@@ -55,11 +50,13 @@ class DirectoryObserver(
 
 object DirectoryObserver {
   case class DirStats(
+                       collectionStart: Instant,
+                       collectionEnd: Instant,
+                       count: Long,
+                       countEmpty: Long,
+                       size: Long,
                        oldest: Option[FileStats],
                        newest: Option[FileStats],
-                       size: Long,
-                       countEmpty: Long,
-                       count: Long = 1
                      )
 
   object DirStats {
@@ -70,62 +67,37 @@ object DirectoryObserver {
 
     implicit val semigroup: Semigroup[DirStats] = Semigroup.instance { (a, b) =>
       DirStats(
-        oldest = (a.oldest ++ b.oldest).minByOption(_.modified),
-        newest = (a.newest ++ b.newest).maxByOption(_.modified),
-        size = a.size + b.size,
-        countEmpty = a.countEmpty + b.countEmpty,
         count = a.count + b.count,
+        countEmpty = a.countEmpty + b.countEmpty,
+        size = a.size + b.size,
+        collectionStart = Seq(a.collectionStart, b.collectionStart).min,
+        collectionEnd = Seq(a.collectionEnd, b.collectionEnd).max,
+        oldest = (a.oldest ++ b.oldest).minByOption(_.modified),
+        newest = (a.newest ++ b.newest).maxByOption(_.modified)
       )
     }
 
     def empty(now: Instant): DirStats = DirStats(
-      oldest = None,
-      newest = None,
-      size = 0,
+      count = 0,
       countEmpty = 0,
-      count = 0
+      size = 0,
+      collectionStart = now,
+      collectionEnd = now,
+      oldest = None,
+      newest = None
     )
 
-    class DirStatsCounters(meter: Meter, prefix: String) {
-      private val unitSeconds = "seconds"
-      private val unitBytes = "bytes"
-
-      private val counterOldestTs = meter.upDownCounterBuilder(s"${prefix}_oldest_ts").setUnit(unitSeconds).build()
-      private val counterOldestAge = meter.upDownCounterBuilder(s"${prefix}_oldest_age").setUnit(unitSeconds).build()
-      private val counterOldestBytes = meter.upDownCounterBuilder(s"${prefix}_oldest_bytes").setUnit(unitBytes).build()
-      private val counterNewestTs = meter.upDownCounterBuilder(s"${prefix}_newest_ts").setUnit(unitSeconds).build()
-      private val counterNewestAge = meter.upDownCounterBuilder(s"${prefix}_newest_age").setUnit(unitSeconds).build()
-      private val counterNewestBytes = meter.upDownCounterBuilder(s"${prefix}_newest_bytes").setUnit(unitBytes).build()
-      private val counterBytes = meter.upDownCounterBuilder(s"${prefix}_bytes").setUnit(unitBytes).build()
-      private val counterCountEmpty = meter.upDownCounterBuilder(s"${prefix}_count_empty").build()
-      private val counterCount = meter.upDownCounterBuilder(s"${prefix}_count").build()
-
-      def add(dirStats: DirStats, path: Path, tags: Map[String, String]): Unit = {
-        val attributes = tags.foldLeft(
-          Attributes.builder()
-            .put("path", path.toString)
-        ) {
-          case (builder, (key, value)) => builder.put(key, value)
-        }.build()
-
-        val now = Instant.now()
-
-        dirStats.oldest.foreach { oldest =>
-          counterOldestTs.add(oldest.modified.getEpochSecond, attributes)
-          counterOldestAge.add(now.getEpochSecond - oldest.modified.getEpochSecond, attributes)
-          counterOldestBytes.add(oldest.size, attributes)
-        }
-
-        dirStats.newest.foreach { newest =>
-          counterNewestTs.add(newest.modified.getEpochSecond, attributes)
-          counterNewestAge.add(now.getEpochSecond - newest.modified.getEpochSecond, attributes)
-          counterNewestBytes.add(newest.size, attributes)
-        }
-
-        counterBytes.add(dirStats.size, attributes)
-        counterCountEmpty.add(dirStats.countEmpty, attributes)
-        counterCount.add(dirStats.count, attributes)
-      }
-    }
+    def single(
+                now: Instant,
+                fileStats: FileStats
+              ): DirStats = DirStats(
+      count = 1,
+      countEmpty = if (fileStats.size == 0) 1 else 0,
+      size = fileStats.size,
+      collectionStart = now,
+      collectionEnd = now,
+      oldest = Some(fileStats),
+      newest = Some(fileStats)
+    )
   }
 }
