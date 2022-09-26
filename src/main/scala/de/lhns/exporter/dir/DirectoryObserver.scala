@@ -20,6 +20,7 @@ class DirectoryObserver(path: Path) {
           .filter(_.isRegularFile)
           .map { attributes =>
             val fileStats = FileStats(
+              name = file.fileName.toString,
               modified = Instant.ofEpochMilli(attributes.lastModifiedTime.toMillis),
               size = attributes.size
             )
@@ -105,6 +106,7 @@ object DirectoryObserver {
   }
 
   case class FileStats(
+                        name: String,
                         modified: Instant,
                         size: Long
                       )

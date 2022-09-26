@@ -6,6 +6,7 @@ import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.metrics.data.MetricData
 
 class DirStatsMetricData(prefix: String) {
+  private val gaugeDurationMs = Gauge(name = s"${prefix}_duration_ms", unit = Some(Gauge.unitMilliseconds))
   private val gaugeCount = Gauge(name = s"${prefix}_count")
   private val gaugeBytes = Gauge(name = s"${prefix}_bytes", unit = Some(Gauge.unitBytes))
   private val gaugeOldestTs = Gauge(name = s"${prefix}_oldest_ts", unit = Some(Gauge.unitSeconds))
@@ -18,32 +19,39 @@ class DirStatsMetricData(prefix: String) {
   def toMetricData(dirStatsCollection: DirStatsCollection, path: Path, tags: Map[String, String]): Iterable[MetricData] = {
     val startTimestamp = dirStatsCollection.collectionStart
     val timestamp = dirStatsCollection.collectionEnd
+    val durationMs = timestamp.toEpochMilli - startTimestamp.toEpochMilli
+    val attributes = tags.foldLeft(
+      Attributes.builder()
+        .put("path", path.toString)
+    ) {
+      case (builder, (key, value)) => builder.put(key, value)
+    }.build()
 
-    dirStatsCollection.groups.flatMap {
+    Seq(
+      gaugeDurationMs.toMetricData(startTimestamp, timestamp, durationMs, attributes)
+    ) ++ dirStatsCollection.groups.flatMap {
       case (key, dirStats) =>
-        val attributes = tags.foldLeft(
-          Attributes.builder()
-            .put("path", path.toString)
-            .put("empty", key.empty.toString)
-            .put("hidden", key.hidden.toString)
-        ) {
-          case (builder, (key, value)) => builder.put(key, value)
-        }.build()
+        val groupAttributes = attributes.toBuilder
+          .put("empty", key.empty.toString)
+          .put("hidden", key.hidden.toString)
+          .build()
 
         Seq(
-          gaugeBytes.toMetricData(startTimestamp, timestamp, dirStats.size, attributes),
-          gaugeCount.toMetricData(startTimestamp, timestamp, dirStats.count, attributes)
+          gaugeBytes.toMetricData(startTimestamp, timestamp, dirStats.size, groupAttributes),
+          gaugeCount.toMetricData(startTimestamp, timestamp, dirStats.count, groupAttributes)
         ) ++ dirStats.oldest.toSeq.flatMap { oldest =>
+          val fileAttributes = groupAttributes.toBuilder.put("name", oldest.name).build()
           Seq(
-            gaugeOldestTs.toMetricData(startTimestamp, timestamp, oldest.modified.getEpochSecond, attributes),
-            gaugeOldestAge.toMetricData(startTimestamp, timestamp, timestamp.getEpochSecond - oldest.modified.getEpochSecond, attributes),
-            gaugeOldestBytes.toMetricData(startTimestamp, timestamp, oldest.size, attributes)
+            gaugeOldestTs.toMetricData(startTimestamp, timestamp, oldest.modified.getEpochSecond, fileAttributes),
+            gaugeOldestAge.toMetricData(startTimestamp, timestamp, timestamp.getEpochSecond - oldest.modified.getEpochSecond, fileAttributes),
+            gaugeOldestBytes.toMetricData(startTimestamp, timestamp, oldest.size, fileAttributes)
           )
         } ++ dirStats.newest.toSeq.flatMap { newest =>
+          val fileAttributes = groupAttributes.toBuilder.put("name", newest.name).build()
           Seq(
-            gaugeNewestTs.toMetricData(startTimestamp, timestamp, newest.modified.getEpochSecond, attributes),
-            gaugeNewestAge.toMetricData(startTimestamp, timestamp, timestamp.getEpochSecond - newest.modified.getEpochSecond, attributes),
-            gaugeNewestBytes.toMetricData(startTimestamp, timestamp, newest.size, attributes)
+            gaugeNewestTs.toMetricData(startTimestamp, timestamp, newest.modified.getEpochSecond, fileAttributes),
+            gaugeNewestAge.toMetricData(startTimestamp, timestamp, timestamp.getEpochSecond - newest.modified.getEpochSecond, fileAttributes),
+            gaugeNewestBytes.toMetricData(startTimestamp, timestamp, newest.size, fileAttributes)
           )
         }
     }

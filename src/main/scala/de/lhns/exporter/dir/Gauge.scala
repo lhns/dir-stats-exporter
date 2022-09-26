@@ -42,6 +42,7 @@ case class Gauge(
 }
 
 object Gauge {
+  val unitMilliseconds = "milliseconds"
   val unitSeconds = "seconds"
   val unitBytes = "bytes"
 }
