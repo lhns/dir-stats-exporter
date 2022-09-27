@@ -13,7 +13,7 @@ class DirectoryObserver(path: Path) {
   def scan: IO[DirStatsCollection] = IO.defer {
     val collectionStart = Instant.now()
     Files[IO].list(path)
-      .map { file =>
+      .flatMap { file =>
         Stream.eval(Files[IO].getBasicFileAttributes(file))
           .attempt
           .flatMap(e => Stream.fromOption(e.toOption))
@@ -34,7 +34,6 @@ class DirectoryObserver(path: Path) {
             )
           }
       }
-      .parJoinUnbounded
       .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
       .compile
       .foldMonoid
