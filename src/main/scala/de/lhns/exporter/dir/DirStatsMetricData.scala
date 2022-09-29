@@ -7,6 +7,8 @@ import io.opentelemetry.sdk.metrics.data.MetricData
 
 class DirStatsMetricData(prefix: String) {
   private val gaugeDurationMs = Gauge(name = s"${prefix}_duration_ms", unit = Some(Gauge.unitMilliseconds))
+  private val gaugeTs = Gauge(name = s"${prefix}_ts", unit = Some(Gauge.unitSeconds))
+  private val gaugeAge = Gauge(name = s"${prefix}_age", unit = Some(Gauge.unitSeconds))
   private val gaugeCount = Gauge(name = s"${prefix}_count")
   private val gaugeBytes = Gauge(name = s"${prefix}_bytes", unit = Some(Gauge.unitBytes))
   private val gaugeOldestTs = Gauge(name = s"${prefix}_oldest_ts", unit = Some(Gauge.unitSeconds))
@@ -28,7 +30,9 @@ class DirStatsMetricData(prefix: String) {
     }.build()
 
     Seq(
-      gaugeDurationMs.toMetricData(startTimestamp, timestamp, durationMs, attributes)
+      gaugeDurationMs.toMetricData(startTimestamp, timestamp, durationMs, attributes),
+      gaugeTs.toMetricData(startTimestamp, timestamp, dirStatsCollection.modified.getEpochSecond, attributes),
+      gaugeAge.toMetricData(startTimestamp, timestamp, timestamp.getEpochSecond - dirStatsCollection.modified.getEpochSecond, attributes)
     ) ++ dirStatsCollection.groups.flatMap {
       case (key, dirStats) =>
         val groupAttributes = attributes.toBuilder

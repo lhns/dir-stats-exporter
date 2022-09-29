@@ -8,44 +8,49 @@ import fs2.io.file.{Files, Path}
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
+import scala.util.chaining._
 
-class DirectoryObserver(path: Path) {
-  def scan: IO[DirStatsCollection] = IO.defer {
-    val collectionStart = Instant.now()
-    Files[IO].list(path)
-      .flatMap { file =>
-        Stream.eval(Files[IO].getBasicFileAttributes(file))
-          .attempt
-          .flatMap(e => Stream.fromOption(e.toOption))
-          .filter(_.isRegularFile)
-          .map { attributes =>
-            val fileStats = FileStats(
-              name = file.fileName.toString,
-              modified = Instant.ofEpochMilli(attributes.lastModifiedTime.toMillis),
-              size = attributes.size
-            )
-            Map(
-              DirStatsKey.fromFileStats(
-                path = file,
-                fileStats = fileStats
-              ) -> DirStats.fromFileStats(
-                fileStats = fileStats
+class DirectoryObserver(path: Path, filter: Option[String]) {
+  private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
+    Instant.ofEpochMilli(finiteDuration.toMillis)
+
+  def scan: IO[DirStatsCollection] =
+    for {
+      collectionStart <- IO.realTimeInstant
+      groups <- Files[IO].list(path)
+        .pipe(stream => filter.fold(stream)(regex => stream.filter(_.fileName.toString.matches(regex))))
+        .flatMap { file =>
+          Stream.eval(Files[IO].getBasicFileAttributes(file))
+            .attempt
+            .flatMap(e => Stream.fromOption(e.toOption))
+            .filter(_.isRegularFile)
+            .map { attributes =>
+              val fileStats = FileStats(
+                name = file.fileName.toString,
+                modified = finiteDurationToInstant(attributes.lastModifiedTime),
+                size = attributes.size
               )
-            )
-          }
-      }
-      .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
-      .compile
-      .foldMonoid
-      .map { groups =>
-        val collectionEnd = Instant.now()
-        DirStatsCollection(
-          collectionStart = collectionStart,
-          collectionEnd = collectionEnd,
-          groups = groups
-        )
-      }
-  }
+              Map(
+                DirStatsKey.fromFileStats(
+                  path = file,
+                  fileStats = fileStats
+                ) -> DirStats.fromFileStats(
+                  fileStats = fileStats
+                )
+              )
+            }
+        }
+        .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
+        .compile
+        .foldMonoid
+      dirAttributes <- Files[IO].getBasicFileAttributes(path)
+      collectionEnd <- IO.realTimeInstant
+    } yield DirStatsCollection(
+      collectionStart = collectionStart,
+      collectionEnd = collectionEnd,
+      modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
+      groups = groups
+    )
 
   def observe(interval: FiniteDuration): Stream[IO, DirStatsCollection] =
     Stream.fixedRateStartImmediately[IO](interval)
@@ -57,6 +62,7 @@ object DirectoryObserver {
   case class DirStatsCollection(
                                  collectionStart: Instant,
                                  collectionEnd: Instant,
+                                 modified: Instant,
                                  groups: Map[DirStatsKey, DirStats]
                                )
 

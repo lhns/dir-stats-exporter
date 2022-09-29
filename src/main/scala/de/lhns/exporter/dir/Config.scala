@@ -23,7 +23,8 @@ object Config {
                         path: Path,
                         //TODO: recursive: Boolean = false,
                         interval: Option[FiniteDuration],
-                        tags: Option[Map[String, String]]
+                        tags: Option[Map[String, String]],
+                        filter: Option[String]
                       ) {
     val tagsOrDefault: Map[String, String] = tags.getOrElse(Map.empty)
   }
