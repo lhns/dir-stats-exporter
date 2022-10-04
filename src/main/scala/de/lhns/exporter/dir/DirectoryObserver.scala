@@ -78,8 +78,8 @@ class DirectoryObserver(
       resultOrError <- Stream.eval(scan.attempt)
       timeAfter <- Stream.eval(IO.realTimeInstant)
       duration = FiniteDuration(timeAfter.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
-      _ <- Stream.eval(adaptiveIntervalMultiplier.filter(_ => duration > interval).map { adaptiveIntervalMultiplier =>
-        val delay: Long = interval.toMillis + ((duration - interval).toMillis * adaptiveIntervalMultiplier).toLong
+      _ <- Stream.eval(adaptiveIntervalMultiplier.map { adaptiveIntervalMultiplier =>
+        val delay: Long = (duration.toMillis * adaptiveIntervalMultiplier).toLong
         delayUntilRef.set(Some(timeBefore.plusMillis(delay)))
       }.sequence)
       result <- Stream.fromOption(resultOrError.toOption)
