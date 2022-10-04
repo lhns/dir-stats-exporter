@@ -1,16 +1,21 @@
 package de.lhns.exporter.dir
 
-import cats.effect.IO
+import cats.effect.{IO, Ref}
 import cats.kernel.Monoid
+import cats.syntax.traverse._
 import de.lhns.exporter.dir.DirectoryObserver.{DirStats, DirStatsCollection, DirStatsKey, FileStats}
 import fs2.Stream
 import fs2.io.file.{Files, Path}
 
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.util.chaining._
 
-class DirectoryObserver(path: Path, filter: Option[String]) {
+class DirectoryObserver(
+                         path: Path,
+                         filter: Option[String]
+                       ) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
@@ -52,10 +57,30 @@ class DirectoryObserver(path: Path, filter: Option[String]) {
       groups = groups
     )
 
-  def observe(interval: FiniteDuration): Stream[IO, DirStatsCollection] =
-    Stream.fixedRateStartImmediately[IO](interval)
-      .evalMap(_ => scan.attempt)
-      .flatMap(e => Stream.fromOption(e.toOption))
+  def observe(
+               interval: FiniteDuration,
+               adaptiveIntervalMultiplier: Option[Double]
+             ): Stream[IO, DirStatsCollection] = {
+    for {
+      delayUntilRef <- Stream.eval(Ref.of[IO, Option[Instant]](None))
+      _ <- Stream.fixedRateStartImmediately[IO](interval)
+      timeBefore <- Stream.eval(IO.realTimeInstant)
+      delayUntil <- Stream.eval(delayUntilRef.get)
+      _ <- Stream.eval(delayUntil.filter(_.isAfter(timeBefore)).map { delayUntil =>
+        val delay: FiniteDuration = FiniteDuration(delayUntil.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
+        IO.sleep(delay)
+      }.sequence)
+      resultOrError <- Stream.eval(scan.attempt)
+      timeAfter <- Stream.eval(IO.realTimeInstant)
+      duration = FiniteDuration(timeAfter.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
+      _ <- Stream.eval(adaptiveIntervalMultiplier.filter(_ => duration > interval).map { adaptiveIntervalMultiplier =>
+        val delay: Long = (duration.toMillis * adaptiveIntervalMultiplier).toLong
+        delayUntilRef.set(Some(timeAfter.plusMillis(delay)))
+      }.sequence)
+      result <- Stream.fromOption(resultOrError.toOption)
+    } yield
+      result
+  }
 }
 
 object DirectoryObserver {

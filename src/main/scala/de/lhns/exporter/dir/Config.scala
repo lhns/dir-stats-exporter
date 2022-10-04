@@ -9,7 +9,8 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case class Config(
                    endpoint: String,
-                   defaultInterval: FiniteDuration,
+                   interval: FiniteDuration,
+                   adaptiveIntervalMultiplier: Option[Double],
                    directories: Seq[DirConfig],
                    prefix: Option[String]
                  ) {
@@ -23,10 +24,17 @@ object Config {
                         path: Path,
                         //TODO: recursive: Boolean = false,
                         interval: Option[FiniteDuration],
+                        adaptiveIntervalMultiplier: Option[Double],
                         tags: Option[Map[String, String]],
                         filter: Option[String]
                       ) {
     val tagsOrDefault: Map[String, String] = tags.getOrElse(Map.empty)
+
+    def intervalOrDefault(config: Config): FiniteDuration =
+      interval.getOrElse(config.interval)
+
+    def adaptiveIntervalMultiplierOrDefault(config: Config): Option[Double] =
+      adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier)
   }
 
   object DirConfig {

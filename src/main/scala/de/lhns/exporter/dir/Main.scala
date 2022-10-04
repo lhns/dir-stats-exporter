@@ -29,7 +29,10 @@ object Main extends IOApp {
               path = directory.path,
               filter = directory.filter
             )
-              .observe(directory.interval.getOrElse(config.defaultInterval))
+              .observe(
+                interval = directory.intervalOrDefault(config),
+                adaptiveIntervalMultiplier = directory.adaptiveIntervalMultiplierOrDefault(config)
+              )
               .map(dirStats => (directory, dirStats))
           }
           .parJoinUnbounded
