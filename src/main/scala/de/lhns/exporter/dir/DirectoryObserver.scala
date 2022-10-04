@@ -64,18 +64,23 @@ class DirectoryObserver(
     for {
       delayUntilRef <- Stream.eval(Ref.of[IO, Option[Instant]](None))
       _ <- Stream.fixedRateStartImmediately[IO](interval)
+      _ <- Stream.eval {
+        for {
+          now <- IO.realTimeInstant
+          delayUntil <- delayUntilRef.get
+          _ <- delayUntil.filter(_.isAfter(now)).map { delayUntil =>
+            val delay: Long = delayUntil.toEpochMilli - now.toEpochMilli
+            IO.sleep(FiniteDuration(delay, TimeUnit.MILLISECONDS))
+          }.sequence
+        } yield ()
+      }
       timeBefore <- Stream.eval(IO.realTimeInstant)
-      delayUntil <- Stream.eval(delayUntilRef.get)
-      _ <- Stream.eval(delayUntil.filter(_.isAfter(timeBefore)).map { delayUntil =>
-        val delay: FiniteDuration = FiniteDuration(delayUntil.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
-        IO.sleep(delay)
-      }.sequence)
       resultOrError <- Stream.eval(scan.attempt)
       timeAfter <- Stream.eval(IO.realTimeInstant)
       duration = FiniteDuration(timeAfter.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
       _ <- Stream.eval(adaptiveIntervalMultiplier.filter(_ => duration > interval).map { adaptiveIntervalMultiplier =>
         val delay: Long = (duration.toMillis * adaptiveIntervalMultiplier).toLong
-        delayUntilRef.set(Some(timeAfter.plusMillis(delay)))
+        delayUntilRef.set(Some(timeBefore.plusMillis(delay)))
       }.sequence)
       result <- Stream.fromOption(resultOrError.toOption)
     } yield
