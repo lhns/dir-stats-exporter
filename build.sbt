@@ -42,12 +42,10 @@ lazy val root = (project in file("."))
     libraryDependencies ++= Seq(
       "ch.qos.logback" % "logback-classic" % V.logbackClassic,
       "com.hunorkovacs" %% "circe-config" % V.circeConfig,
-      "de.lolhens" %% "scala-trustmanager-utils" % V.trustmanagerUtils,
       "io.circe" %% "circe-core" % V.circe,
       "io.circe" %% "circe-generic" % V.circe,
       "io.circe" %% "circe-parser" % V.circe,
       "io.opentelemetry" % "opentelemetry-exporter-otlp" % V.opentelemetry,
-      "org.bidib.com.github.markusbernhardt" % "proxy-vole" % V.proxyVole,
       "org.http4s" %% "http4s-dsl" % V.http4s,
       "org.http4s" %% "http4s-circe" % V.http4s,
       "org.http4s" %% "http4s-client" % V.http4s,
