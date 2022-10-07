@@ -18,7 +18,7 @@ class DirStatsMetricData(prefix: String) {
   private val gaugeNewestAge = Gauge(name = s"${prefix}_newest_age", unit = Some(Gauge.unitSeconds))
   private val gaugeNewestBytes = Gauge(name = s"${prefix}_newest_bytes", unit = Some(Gauge.unitBytes))
 
-  def toMetricData(dirStatsCollection: DirStatsCollection, path: Path, tags: Map[String, String]): Iterable[MetricData] = {
+  def toMetricData(dirStatsCollection: DirStatsCollection, path: Path, tags: Map[String, String]): Seq[MetricData] = {
     val startTimestamp = dirStatsCollection.collectionStart
     val timestamp = dirStatsCollection.collectionEnd
     val durationMs = timestamp.toEpochMilli - startTimestamp.toEpochMilli
