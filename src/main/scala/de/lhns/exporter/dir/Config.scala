@@ -8,7 +8,7 @@ import io.circe.{Codec, Decoder, Encoder}
 import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case class Config(
-                   endpoint: String,
+                   collectorEndpoint: String,
                    interval: FiniteDuration,
                    adaptiveIntervalMultiplier: Option[Double],
                    directories: Seq[DirConfig],

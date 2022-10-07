@@ -22,7 +22,7 @@ OTLP Exporter that reports file count and last modified information.
 
 ```json
 {
-  "endpoint": "http://otel-collector",
+  "collectorEndpoint": "http://otel-collector",
   "interval": "1 minute",
   "directories": [
     {
