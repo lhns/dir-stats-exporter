@@ -38,7 +38,7 @@ object Main extends IOApp {
           .parJoinUnbounded
           .flatMap {
             case (directory, dirStatsCollection) =>
-              Stream.iterable(
+              Stream.emits(
                 dirStatsMetricData.toMetricData(dirStatsCollection, directory.path, directory.tagsOrDefault)
               )
           }
