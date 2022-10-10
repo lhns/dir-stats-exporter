@@ -3,7 +3,7 @@ package de.lhns.exporter.dir
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.common.InstrumentationScopeInfo
 import io.opentelemetry.sdk.metrics.data.MetricData
-import io.opentelemetry.sdk.metrics.internal.data.{ImmutableGaugeData, ImmutableLongPointData, ImmutableMetricData}
+import io.opentelemetry.sdk.metrics.internal.data.{ImmutableDoublePointData, ImmutableGaugeData, ImmutableLongPointData, ImmutableMetricData}
 import io.opentelemetry.sdk.resources.Resource
 
 import java.time.Instant
@@ -39,10 +39,32 @@ case class Gauge(
       )
     )
   )
+
+  def toMetricData(
+                    startTimestamp: Instant,
+                    timestamp: Instant,
+                    value: Double,
+                    attributes: Attributes
+                  ): MetricData = ImmutableMetricData.createDoubleGauge(
+    resource,
+    instrumentationScopeInfo,
+    name,
+    description.getOrElse(""),
+    unit.getOrElse(""),
+    ImmutableGaugeData.create(
+      util.Arrays.asList(
+        ImmutableDoublePointData.create(
+          ChronoUnit.NANOS.between(Instant.EPOCH, startTimestamp),
+          ChronoUnit.NANOS.between(Instant.EPOCH, timestamp),
+          attributes,
+          value
+        )
+      )
+    )
+  )
 }
 
 object Gauge {
-  val unitMilliseconds = "milliseconds"
   val unitSeconds = "seconds"
   val unitBytes = "bytes"
 }
