@@ -42,7 +42,7 @@ object Main extends IOApp {
                 dirStatsMetricData.toMetricData(dirStatsCollection, directory.path, directory.tagsOrDefault)
               )
           }
-          .groupWithin(8192, 10.seconds)
+          .groupWithin(8192, 1.seconds)
           .map { metricDataChunk =>
             metricExporter.`export`(metricDataChunk.toList.asJavaCollection)
           }
