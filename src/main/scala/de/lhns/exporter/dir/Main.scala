@@ -21,7 +21,10 @@ object Main extends IOApp {
   private def applicationResource(config: Config): Resource[IO, Unit] =
     for {
       metricExporter <- makeMetricExporter(config.collectorEndpoint)
-      dirStatsMetricData = new DirStatsMetricData(config.prefixOrDefault)
+      dirStatsMetricData = new DirStatsMetricData(
+        jobName = config.jobNameOrDefault,
+        prefix = config.prefixOrDefault
+      )
       _ <- Resource.eval {
         Stream.emits(config.directories)
           .map { directory =>

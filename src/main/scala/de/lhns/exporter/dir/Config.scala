@@ -9,11 +9,14 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 case class Config(
                    collectorEndpoint: String,
+                   jobName: Option[String],
                    interval: FiniteDuration,
                    adaptiveIntervalMultiplier: Option[Double],
                    directories: Seq[DirConfig],
                    prefix: Option[String]
                  ) {
+  val jobNameOrDefault: String = jobName.getOrElse("dir-stats-exporter")
+
   val prefixOrDefault: String = prefix.getOrElse("dir_stats")
 }
 

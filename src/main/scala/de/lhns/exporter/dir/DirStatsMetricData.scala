@@ -4,19 +4,23 @@ import de.lhns.exporter.dir.DirectoryObserver.DirStatsCollection
 import fs2.io.file.Path
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.metrics.data.MetricData
+import io.opentelemetry.sdk.resources.Resource
+import io.opentelemetry.semconv.resource.attributes.ResourceAttributes.SERVICE_NAME
 
-class DirStatsMetricData(prefix: String) {
-  private val gaugeDurationMs = Gauge(name = s"${prefix}_duration_ms", unit = Some(Gauge.unitMilliseconds))
-  private val gaugeTs = Gauge(name = s"${prefix}_ts", unit = Some(Gauge.unitSeconds))
-  private val gaugeAge = Gauge(name = s"${prefix}_age", unit = Some(Gauge.unitSeconds))
-  private val gaugeCount = Gauge(name = s"${prefix}_count")
-  private val gaugeBytes = Gauge(name = s"${prefix}_bytes", unit = Some(Gauge.unitBytes))
-  private val gaugeOldestTs = Gauge(name = s"${prefix}_oldest_ts", unit = Some(Gauge.unitSeconds))
-  private val gaugeOldestAge = Gauge(name = s"${prefix}_oldest_age", unit = Some(Gauge.unitSeconds))
-  private val gaugeOldestBytes = Gauge(name = s"${prefix}_oldest_bytes", unit = Some(Gauge.unitBytes))
-  private val gaugeNewestTs = Gauge(name = s"${prefix}_newest_ts", unit = Some(Gauge.unitSeconds))
-  private val gaugeNewestAge = Gauge(name = s"${prefix}_newest_age", unit = Some(Gauge.unitSeconds))
-  private val gaugeNewestBytes = Gauge(name = s"${prefix}_newest_bytes", unit = Some(Gauge.unitBytes))
+class DirStatsMetricData(jobName: String, prefix: String) {
+  private val resource = Resource.getDefault.merge(Resource.create(Attributes.of(SERVICE_NAME, jobName)))
+
+  private val gaugeDurationMs = Gauge(resource, name = s"${prefix}_duration_ms", unit = Some(Gauge.unitMilliseconds))
+  private val gaugeTs = Gauge(resource, name = s"${prefix}_ts", unit = Some(Gauge.unitSeconds))
+  private val gaugeAge = Gauge(resource, name = s"${prefix}_age", unit = Some(Gauge.unitSeconds))
+  private val gaugeCount = Gauge(resource, name = s"${prefix}_count")
+  private val gaugeBytes = Gauge(resource, name = s"${prefix}_bytes", unit = Some(Gauge.unitBytes))
+  private val gaugeOldestTs = Gauge(resource, name = s"${prefix}_oldest_ts", unit = Some(Gauge.unitSeconds))
+  private val gaugeOldestAge = Gauge(resource, name = s"${prefix}_oldest_age", unit = Some(Gauge.unitSeconds))
+  private val gaugeOldestBytes = Gauge(resource, name = s"${prefix}_oldest_bytes", unit = Some(Gauge.unitBytes))
+  private val gaugeNewestTs = Gauge(resource, name = s"${prefix}_newest_ts", unit = Some(Gauge.unitSeconds))
+  private val gaugeNewestAge = Gauge(resource, name = s"${prefix}_newest_age", unit = Some(Gauge.unitSeconds))
+  private val gaugeNewestBytes = Gauge(resource, name = s"${prefix}_newest_bytes", unit = Some(Gauge.unitBytes))
 
   def toMetricData(dirStatsCollection: DirStatsCollection, path: Path, tags: Map[String, String]): Seq[MetricData] = {
     val startTimestamp = dirStatsCollection.collectionStart
