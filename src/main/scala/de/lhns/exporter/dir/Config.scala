@@ -55,8 +55,8 @@ object Config {
   )
 
   lazy val fromEnv: Config =
-    io.circe.config.parser.decode[Config](
-      Option(System.getenv("CONFIG"))
-        .getOrElse(throw new IllegalArgumentException("Missing environment variable: CONFIG"))
-    ).toTry.get
+    Option(System.getenv("CONFIG"))
+      .toRight(new IllegalArgumentException("Missing environment variable: CONFIG"))
+      .flatMap(io.circe.config.parser.decode[Config](_))
+      .toTry.get
 }
