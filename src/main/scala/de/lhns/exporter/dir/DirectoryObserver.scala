@@ -3,6 +3,7 @@ package de.lhns.exporter.dir
 import cats.effect.{IO, Ref}
 import cats.kernel.Monoid
 import cats.syntax.traverse._
+import de.lhns.exporter.dir.Config.DirConfig
 import de.lhns.exporter.dir.DirectoryObserver.{DirStats, DirStatsCollection, DirStatsKey, FileStats}
 import fs2.Stream
 import fs2.io.file.{Files, Path}
@@ -12,18 +13,24 @@ import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.util.chaining._
 
-class DirectoryObserver(
-                         path: Path,
-                         filter: Option[String]
-                       ) {
+class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
   def scan: IO[DirStatsCollection] =
     for {
       collectionStart <- IO.realTimeInstant
-      groups <- Files[IO].list(path)
-        .pipe(stream => filter.fold(stream)(regex => stream.filter(_.fileName.toString.matches(regex))))
+      groups <- Files[IO].list(dirConfig.path)
+        .pipe(stream =>
+          if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
+            stream
+          else
+            stream.filter { file =>
+              val fileName = file.fileName.toString
+              (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
+                !dirConfig.excludeOrDefault.exists(fileName.matches)
+            }
+        )
         .flatMap { file =>
           Stream.eval(Files[IO].getBasicFileAttributes(file))
             .attempt
@@ -48,7 +55,7 @@ class DirectoryObserver(
         .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
         .compile
         .foldMonoid
-      dirAttributes <- Files[IO].getBasicFileAttributes(path)
+      dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
       collectionEnd <- IO.realTimeInstant
     } yield DirStatsCollection(
       collectionStart = collectionStart,

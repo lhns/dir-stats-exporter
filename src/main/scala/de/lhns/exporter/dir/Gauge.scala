@@ -1,5 +1,6 @@
 package de.lhns.exporter.dir
 
+import cats.syntax.option._
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.common.InstrumentationScopeInfo
 import io.opentelemetry.sdk.metrics.data.MetricData
@@ -26,8 +27,8 @@ case class Gauge(
     resource,
     instrumentationScopeInfo,
     name,
-    description.getOrElse(""),
-    unit.getOrElse(""),
+    description.orEmpty,
+    unit.orEmpty,
     ImmutableGaugeData.create(
       util.Arrays.asList(
         ImmutableLongPointData.create(
@@ -49,8 +50,8 @@ case class Gauge(
     resource,
     instrumentationScopeInfo,
     name,
-    description.getOrElse(""),
-    unit.getOrElse(""),
+    description.orEmpty,
+    unit.orEmpty,
     ImmutableGaugeData.create(
       util.Arrays.asList(
         ImmutableDoublePointData.create(

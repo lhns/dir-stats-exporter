@@ -1,5 +1,6 @@
 package de.lhns.exporter.dir
 
+import cats.syntax.option._
 import de.lhns.exporter.dir.Config.DirConfig
 import fs2.io.file.Path
 import io.circe.generic.semiauto._
@@ -29,15 +30,20 @@ object Config {
                         interval: Option[FiniteDuration],
                         adaptiveIntervalMultiplier: Option[Double],
                         tags: Option[Map[String, String]],
-                        filter: Option[String]
+                        include: Option[Seq[String]],
+                        exclude: Option[Seq[String]]
                       ) {
-    val tagsOrDefault: Map[String, String] = tags.getOrElse(Map.empty)
+    val tagsOrDefault: Map[String, String] = tags.orEmpty
 
     def intervalOrDefault(config: Config): FiniteDuration =
       interval.getOrElse(config.interval)
 
     def adaptiveIntervalMultiplierOrDefault(config: Config): Option[Double] =
       adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier)
+
+    val includeOrDefault: Seq[String] = include.orEmpty
+
+    val excludeOrDefault: Seq[String] = exclude.orEmpty
   }
 
   object DirConfig {

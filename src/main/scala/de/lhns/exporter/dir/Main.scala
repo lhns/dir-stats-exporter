@@ -28,10 +28,7 @@ object Main extends IOApp {
       _ <- Resource.eval {
         Stream.emits(config.directories)
           .map { directory =>
-            new DirectoryObserver(
-              path = directory.path,
-              filter = directory.filter
-            )
+            new DirectoryObserver(directory)
               .observe(
                 interval = directory.intervalOrDefault(config),
                 adaptiveIntervalMultiplier = directory.adaptiveIntervalMultiplierOrDefault(config)
