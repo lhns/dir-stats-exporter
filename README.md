@@ -38,3 +38,5 @@ OTLP Exporter that reports file count and last modified information.
   ]
 }
 ```
+
+- The `include` and `exclude` patterns are anchored.
