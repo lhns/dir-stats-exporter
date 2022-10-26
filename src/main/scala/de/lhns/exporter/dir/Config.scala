@@ -56,7 +56,10 @@ object Config {
   )
 
   private implicit val finiteDurationCodec: Codec[FiniteDuration] = Codec.from(
-    Decoder.decodeString.map(Duration(_)).map { case e: FiniteDuration => e },
+    Decoder.decodeString.map(Duration(_)).map {
+      case e: FiniteDuration => e
+      case _ => throw new IllegalArgumentException("duration must be finite")
+    },
     Encoder.encodeString.contramap(_.toString)
   )
 
