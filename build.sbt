@@ -5,7 +5,6 @@ val V = new {
   val circe = "0.14.3"
   val circeConfig = "0.10.0"
   val http4s = "0.23.16"
-  val http4sJdkHttpClient = "0.7.0"
   val logbackClassic = "1.4.5"
   val munit = "0.7.29"
   val munitTaglessFinal = "0.2.0"
@@ -50,7 +49,6 @@ lazy val root = (project in file("."))
       "io.opentelemetry" % "opentelemetry-exporter-otlp" % V.opentelemetry,
       "org.http4s" %% "http4s-dsl" % V.http4s,
       "org.http4s" %% "http4s-circe" % V.http4s,
-      "org.http4s" %% "http4s-client" % V.http4s,
-      "org.http4s" %% "http4s-jdk-http-client" % V.http4sJdkHttpClient,
+      "org.http4s" %% "http4s-client" % V.http4s
     )
   )
