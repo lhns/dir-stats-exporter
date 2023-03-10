@@ -8,7 +8,7 @@ val V = new {
   val logbackClassic = "1.4.5"
   val munit = "0.7.29"
   val munitTaglessFinal = "0.2.0"
-  val opentelemetry = "1.23.1"
+  val opentelemetry = "1.24.0"
 }
 
 lazy val commonSettings: Seq[Setting[_]] = Seq(
