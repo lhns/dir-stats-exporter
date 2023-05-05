@@ -49,6 +49,8 @@ object Config {
     val includeOrDefault: Seq[String] = include.orEmpty
 
     val excludeOrDefault: Seq[String] = exclude.orEmpty
+
+    def withPath(path: Path): DirConfig = copy(path = path)
   }
 
   object DirConfig {

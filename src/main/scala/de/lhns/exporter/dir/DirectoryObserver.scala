@@ -17,10 +17,10 @@ class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
-  private def scanPath(path: Path): Stream[IO, DirStatsCollection] =
+  private def scanPath(dirConfig: DirConfig): Stream[IO, DirStatsCollection] =
     Stream.eval(for {
       collectionStart <- IO.realTimeInstant
-      groups <- Files[IO].list(path)
+      groups <- Files[IO].list(dirConfig.path)
         .pipe(stream =>
           if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
             stream
@@ -55,10 +55,10 @@ class DirectoryObserver(dirConfig: DirConfig) {
         .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
         .compile
         .foldMonoid
-      dirAttributes <- Files[IO].getBasicFileAttributes(path)
+      dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
       collectionEnd <- IO.realTimeInstant
     } yield DirStatsCollection(
-      path = path,
+      dirConfig = dirConfig,
       collectionStart = collectionStart,
       collectionEnd = collectionEnd,
       modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
@@ -66,7 +66,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
     ))
 
   private def scan: Stream[IO, DirStatsCollection] =
-    scanPath(dirConfig.path)
+    scanPath(dirConfig)
 
   def observe(
                interval: FiniteDuration,
@@ -101,7 +101,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
 
 object DirectoryObserver {
   case class DirStatsCollection(
-                                 path: Path,
+                                 dirConfig: DirConfig,
                                  collectionStart: Instant,
                                  collectionEnd: Instant,
                                  modified: Instant,
