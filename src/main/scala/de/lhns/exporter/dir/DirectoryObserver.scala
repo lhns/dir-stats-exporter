@@ -17,10 +17,10 @@ class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
-  def scan: IO[DirStatsCollection] =
-    for {
+  private def scanPath(path: Path): Stream[IO, DirStatsCollection] =
+    Stream.eval(for {
       collectionStart <- IO.realTimeInstant
-      groups <- Files[IO].list(dirConfig.path)
+      groups <- Files[IO].list(path)
         .pipe(stream =>
           if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
             stream
@@ -55,14 +55,18 @@ class DirectoryObserver(dirConfig: DirConfig) {
         .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
         .compile
         .foldMonoid
-      dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
+      dirAttributes <- Files[IO].getBasicFileAttributes(path)
       collectionEnd <- IO.realTimeInstant
     } yield DirStatsCollection(
+      path = path,
       collectionStart = collectionStart,
       collectionEnd = collectionEnd,
       modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
       groups = groups
-    )
+    ))
+
+  private def scan: Stream[IO, DirStatsCollection] =
+    scanPath(dirConfig.path)
 
   def observe(
                interval: FiniteDuration,
@@ -82,14 +86,14 @@ class DirectoryObserver(dirConfig: DirConfig) {
         } yield ()
       }
       timeBefore <- Stream.eval(IO.realTimeInstant)
-      resultOrError <- Stream.eval(scan.attempt)
+      resultOrError <- Stream.eval(scan.chunkAll.compile.lastOrError.attempt)
       timeAfter <- Stream.eval(IO.realTimeInstant)
       duration = FiniteDuration(timeAfter.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
       _ <- Stream.eval(adaptiveIntervalMultiplier.map { adaptiveIntervalMultiplier =>
         val delay: Long = (duration.toMillis * adaptiveIntervalMultiplier).toLong
         delayUntilRef.set(Some(timeBefore.plusMillis(delay)))
       }.sequence)
-      result <- Stream.fromOption(resultOrError.toOption)
+      result <- Stream.fromOption(resultOrError.toOption).flatMap(Stream.chunk)
     } yield
       result
   }
@@ -97,6 +101,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
 
 object DirectoryObserver {
   case class DirStatsCollection(
+                                 path: Path,
                                  collectionStart: Instant,
                                  collectionEnd: Instant,
                                  modified: Instant,
