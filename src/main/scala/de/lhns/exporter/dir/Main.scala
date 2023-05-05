@@ -1,16 +1,22 @@
 package de.lhns.exporter.dir
 
+import cats.effect.std.Env
 import cats.effect.{ExitCode, IO, IOApp, Resource}
 import fs2.Stream
 import io.opentelemetry.exporter.otlp.metrics.OtlpGrpcMetricExporter
 import io.opentelemetry.sdk.metrics.`export`.MetricExporter
+import org.slf4j.bridge.SLF4JBridgeHandler
 
 import scala.concurrent.duration._
 import scala.jdk.CollectionConverters._
 
 object Main extends IOApp {
-  override def run(args: List[String]): IO[ExitCode] =
-    applicationResource(Config.fromEnv).use(_ => IO.never)
+  override def run(args: List[String]): IO[ExitCode] = {
+    SLF4JBridgeHandler.removeHandlersForRootLogger()
+    SLF4JBridgeHandler.install()
+
+    applicationResource.use(_ => IO.never)
+  }
 
   def makeMetricExporter(endpoint: String): Resource[IO, MetricExporter] = Resource.liftK(IO {
     OtlpGrpcMetricExporter.builder()
@@ -18,8 +24,9 @@ object Main extends IOApp {
       .build()
   })
 
-  private def applicationResource(config: Config): Resource[IO, Unit] =
+  private def applicationResource: Resource[IO, Unit] =
     for {
+      config <- Resource.eval(Config.fromEnv(Env.make[IO]))
       metricExporter <- makeMetricExporter(config.collectorEndpoint)
       dirStatsMetricData = new DirStatsMetricData(
         jobName = config.jobNameOrDefault,
