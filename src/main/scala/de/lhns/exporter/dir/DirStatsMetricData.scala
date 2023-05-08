@@ -1,7 +1,6 @@
 package de.lhns.exporter.dir
 
 import de.lhns.exporter.dir.DirectoryObserver.DirStatsCollection
-import fs2.io.file.Path
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.metrics.data.MetricData
 import io.opentelemetry.sdk.resources.Resource
@@ -24,15 +23,15 @@ class DirStatsMetricData(jobName: String, prefix: String) {
   private val gaugeNewestAgeSeconds = Gauge(resource, name = s"${prefix}_newest_age_seconds", unit = Some(Gauge.unitSeconds))
   private val gaugeNewestBytes = Gauge(resource, name = s"${prefix}_newest_bytes", unit = Some(Gauge.unitBytes))
 
-  def toMetricData(dirStatsCollection: DirStatsCollection, path: Path, tags: Map[String, String]): Seq[MetricData] = {
+  def toMetricData(dirStatsCollection: DirStatsCollection): Seq[MetricData] = {
     val startTimestamp = dirStatsCollection.collectionStart
     val timestamp = dirStatsCollection.collectionEnd
 
-    val attributes = tags.foldLeft(
+    val attributes = dirStatsCollection.dirConfig.tagsOrDefault.foldLeft(
       Attributes.builder()
-        .put("path", path.toString)
-    ) {
-      case (builder, (key, value)) => builder.put(key, value)
+        .put("path", dirStatsCollection.dirConfig.path.toString)
+    ) { case (builder, (key, value)) =>
+      builder.put(key, value)
     }.build()
 
     Seq(

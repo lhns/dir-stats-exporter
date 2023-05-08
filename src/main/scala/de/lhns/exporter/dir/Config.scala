@@ -29,14 +29,14 @@ object Config {
 
   case class DirConfig(
                         path: Path,
-                        //TODO: recursive: Boolean = false,
+                        recursive: Option[Boolean],
                         interval: Option[FiniteDuration],
                         adaptiveIntervalMultiplier: Option[Double],
                         tags: Option[Map[String, String]],
                         include: Option[Seq[String]],
                         exclude: Option[Seq[String]]
                       ) {
-    val tagsOrDefault: Map[String, String] = tags.orEmpty
+    val recursiveOrDefault: Boolean = recursive.getOrElse(false)
 
     def intervalOrDefault(config: Config): FiniteDuration =
       interval.getOrElse(config.interval)
@@ -44,9 +44,13 @@ object Config {
     def adaptiveIntervalMultiplierOrDefault(config: Config): Option[Double] =
       adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier)
 
+    val tagsOrDefault: Map[String, String] = tags.orEmpty
+
     val includeOrDefault: Seq[String] = include.orEmpty
 
     val excludeOrDefault: Seq[String] = exclude.orEmpty
+
+    def withPath(path: Path): DirConfig = copy(path = path)
   }
 
   object DirConfig {

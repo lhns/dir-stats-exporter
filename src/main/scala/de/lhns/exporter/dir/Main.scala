@@ -40,14 +40,11 @@ object Main extends IOApp {
                 interval = directory.intervalOrDefault(config),
                 adaptiveIntervalMultiplier = directory.adaptiveIntervalMultiplierOrDefault(config)
               )
-              .map(dirStats => (directory, dirStats))
           }
           .parJoinUnbounded
-          .flatMap {
-            case (directory, dirStatsCollection) =>
-              Stream.emits(
-                dirStatsMetricData.toMetricData(dirStatsCollection, directory.path, directory.tagsOrDefault)
-              )
+          .flatMap(Stream.emits)
+          .flatMap { dirStatsCollection =>
+            Stream.emits(dirStatsMetricData.toMetricData(dirStatsCollection))
           }
           .groupWithin(8192, 1.seconds)
           .map { metricDataChunk =>
