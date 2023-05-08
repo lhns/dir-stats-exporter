@@ -28,6 +28,7 @@ OTLP Exporter that reports file count and last modified information.
     {
       "path": "/test",
       "interval": "10 minutes",
+      "recursive": false,
       "include": [
         ".*"
       ],
