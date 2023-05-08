@@ -29,6 +29,7 @@ class DirStatsMetricData(jobName: String, prefix: String) {
 
     val attributes = dirStatsCollection.dirConfig.tagsOrDefault.foldLeft(
       Attributes.builder()
+        .put("path", dirStatsCollection.dirConfig.path.toString)
     ) { case (builder, (key, value)) =>
       builder.put(key, value)
     }.build()
@@ -40,7 +41,6 @@ class DirStatsMetricData(jobName: String, prefix: String) {
     ) ++ dirStatsCollection.groups.flatMap {
       case (key, dirStats) =>
         val groupAttributes = attributes.toBuilder
-          .put("path", key.path.toString)
           .put("empty", key.empty.toString)
           .put("hidden", key.hidden.toString)
           .build()

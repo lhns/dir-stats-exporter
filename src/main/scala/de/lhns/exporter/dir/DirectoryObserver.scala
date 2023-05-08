@@ -17,70 +17,79 @@ class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
-  private def scanPath(dirPath: Path): IO[Map[DirStatsKey, DirStats]] = {
-    val emptyMap = IO.pure(Map.empty[DirStatsKey, DirStats])
-    Files[IO].list(dirPath)
-      .pipe(stream =>
-        if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
-          stream
-        else
-          stream.filter { file =>
-            val fileName = file.fileName.toString
-            (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
-              !dirConfig.excludeOrDefault.exists(fileName.matches)
-          }
-      )
-      .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
-        Stream.eval(Files[IO].getBasicFileAttributes(path))
-          .attempt
-          .flatMap(e => Stream.fromOption(e.toOption))
-          .evalMap { attributes =>
-            if (attributes.isRegularFile) {
-              val fileStats = FileStats(
-                name = path.fileName.toString,
-                modified = finiteDurationToInstant(attributes.lastModifiedTime),
-                size = attributes.size
-              )
-              IO.pure(Map(
-                DirStatsKey.fromFileStats(
-                  filePath = path,
-                  fileStats = fileStats
-                ) -> DirStats.fromFileStats(
-                  fileStats = fileStats
-                )
-              ))
-            } else if (dirConfig.recursiveOrDefault) {
-              scanPath(path)
-            } else {
-              emptyMap
-            }
-          }
-      }
-      .append(Stream.emit(Map(
-        DirStatsKey.default(dirPath) -> Monoid[DirStats].empty
-      )))
-      .compile
-      .foldMonoid
-  }
+  private val emptyGroupIO = IO.pure(Map.empty[DirStatsKey, DirStats])
 
-  private def scan: IO[DirStatsCollection] =
-    for {
-      collectionStart <- IO.realTimeInstant
-      groups <- scanPath(dirConfig.path)
-      dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
-      collectionEnd <- IO.realTimeInstant
-    } yield DirStatsCollection(
-      dirConfig = dirConfig,
-      collectionStart = collectionStart,
-      collectionEnd = collectionEnd,
-      modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
-      groups = groups
-    )
+  private def scanPath(dirConfig: DirConfig): IO[Seq[DirStatsCollection]] =
+    Ref.of[IO, Seq[DirStatsCollection]](Seq.empty).flatMap { childStatCollectionsRef =>
+      val collectGroups: IO[Map[DirStatsKey, DirStats]] = Files[IO].list(dirConfig.path)
+        .pipe(stream =>
+          if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
+            stream
+          else
+            stream.filter { file =>
+              val fileName = file.fileName.toString
+              (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
+                !dirConfig.excludeOrDefault.exists(fileName.matches)
+            }
+        )
+        .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
+          Stream.eval(Files[IO].getBasicFileAttributes(path))
+            .attempt
+            .flatMap(e => Stream.fromOption(e.toOption))
+            .evalMap { attributes =>
+              if (attributes.isRegularFile) {
+                val fileStats = FileStats(
+                  name = path.fileName.toString,
+                  modified = finiteDurationToInstant(attributes.lastModifiedTime),
+                  size = attributes.size
+                )
+                IO.pure(Map(
+                  DirStatsKey.fromFileStats(
+                    filePath = path,
+                    fileStats = fileStats
+                  ) -> DirStats.fromFileStats(
+                    fileStats = fileStats
+                  )
+                ))
+              } else if (dirConfig.recursiveOrDefault) {
+                scanPath(dirConfig.withPath(path))
+                  .flatMap { childStatCollections =>
+                    childStatCollectionsRef.update(_ ++ childStatCollections)
+                  }
+                  .flatMap(_ => emptyGroupIO)
+              } else {
+                emptyGroupIO
+              }
+            }
+        }
+        .append(Stream.emit(Map(
+          DirStatsKey.default -> Monoid[DirStats].empty
+        )))
+        .compile
+        .foldMonoid
+
+      for {
+        collectionStart <- IO.realTimeInstant
+        groups <- collectGroups
+        dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
+        collectionEnd <- IO.realTimeInstant
+        childStatCollections <- childStatCollectionsRef.get
+      } yield DirStatsCollection(
+        dirConfig = dirConfig,
+        collectionStart = collectionStart,
+        collectionEnd = collectionEnd,
+        modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
+        groups = groups
+      ) +: childStatCollections
+    }
+
+  private def scan: IO[Seq[DirStatsCollection]] =
+    scanPath(dirConfig)
 
   def observe(
                interval: FiniteDuration,
                adaptiveIntervalMultiplier: Option[Double]
-             ): Stream[IO, DirStatsCollection] = {
+             ): Stream[IO, Seq[DirStatsCollection]] = {
     for {
       delayUntilRef <- Stream.eval(Ref.of[IO, Option[Instant]](None))
       _ <- Stream.fixedRateStartImmediately[IO](interval)
@@ -118,20 +127,17 @@ object DirectoryObserver {
                                )
 
   case class DirStatsKey(
-                          path: Path,
                           empty: Boolean,
                           hidden: Boolean
                         )
 
   object DirStatsKey {
-    def default(dirPath: Path): DirStatsKey = DirStatsKey(
-      path = dirPath,
+    val default: DirStatsKey = DirStatsKey(
       empty = false,
       hidden = false
     )
 
     def fromFileStats(filePath: Path, fileStats: FileStats): DirStatsKey = DirStatsKey(
-      path = filePath.parent.get,
       empty = fileStats.size == 0,
       hidden = filePath.fileName.toString.startsWith(".")
     )

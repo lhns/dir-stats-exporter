@@ -42,6 +42,7 @@ object Main extends IOApp {
               )
           }
           .parJoinUnbounded
+          .flatMap(Stream.emits)
           .flatMap { dirStatsCollection =>
             Stream.emits(dirStatsMetricData.toMetricData(dirStatsCollection))
           }
