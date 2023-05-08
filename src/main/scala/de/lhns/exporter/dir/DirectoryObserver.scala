@@ -17,44 +17,56 @@ class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
-  private def scanPath(dirConfig: DirConfig): Stream[IO, DirStatsCollection] =
-    Stream.eval(for {
-      collectionStart <- IO.realTimeInstant
-      groups <- Files[IO].list(dirConfig.path)
-        .pipe(stream =>
-          if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
-            stream
-          else
-            stream.filter { file =>
-              val fileName = file.fileName.toString
-              (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
-                !dirConfig.excludeOrDefault.exists(fileName.matches)
-            }
-        )
-        .flatMap { file =>
-          Stream.eval(Files[IO].getBasicFileAttributes(file))
-            .attempt
-            .flatMap(e => Stream.fromOption(e.toOption))
-            .filter(_.isRegularFile)
-            .map { attributes =>
+  private def scanPath(dirPath: Path): IO[Map[DirStatsKey, DirStats]] = {
+    val emptyMap = IO.pure(Map.empty[DirStatsKey, DirStats])
+    Files[IO].list(dirPath)
+      .pipe(stream =>
+        if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
+          stream
+        else
+          stream.filter { file =>
+            val fileName = file.fileName.toString
+            (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
+              !dirConfig.excludeOrDefault.exists(fileName.matches)
+          }
+      )
+      .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
+        Stream.eval(Files[IO].getBasicFileAttributes(path))
+          .attempt
+          .flatMap(e => Stream.fromOption(e.toOption))
+          .evalMap { attributes =>
+            if (attributes.isRegularFile) {
               val fileStats = FileStats(
-                name = file.fileName.toString,
+                name = path.fileName.toString,
                 modified = finiteDurationToInstant(attributes.lastModifiedTime),
                 size = attributes.size
               )
-              Map(
+              IO.pure(Map(
                 DirStatsKey.fromFileStats(
-                  path = file,
+                  filePath = path,
                   fileStats = fileStats
                 ) -> DirStats.fromFileStats(
                   fileStats = fileStats
                 )
-              )
+              ))
+            } else if (dirConfig.recursiveOrDefault) {
+              scanPath(path)
+            } else {
+              emptyMap
             }
-        }
-        .append(Stream.emit(Map(DirStatsKey.default -> Monoid[DirStats].empty)))
-        .compile
-        .foldMonoid
+          }
+      }
+      .append(Stream.emit(Map(
+        DirStatsKey.default(dirPath) -> Monoid[DirStats].empty
+      )))
+      .compile
+      .foldMonoid
+  }
+
+  private def scan: IO[DirStatsCollection] =
+    for {
+      collectionStart <- IO.realTimeInstant
+      groups <- scanPath(dirConfig.path)
       dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
       collectionEnd <- IO.realTimeInstant
     } yield DirStatsCollection(
@@ -63,10 +75,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
       collectionEnd = collectionEnd,
       modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
       groups = groups
-    ))
-
-  private def scan: Stream[IO, DirStatsCollection] =
-    scanPath(dirConfig)
+    )
 
   def observe(
                interval: FiniteDuration,
@@ -86,14 +95,14 @@ class DirectoryObserver(dirConfig: DirConfig) {
         } yield ()
       }
       timeBefore <- Stream.eval(IO.realTimeInstant)
-      resultOrError <- Stream.eval(scan.chunkAll.compile.lastOrError.attempt)
+      resultOrError <- Stream.eval(scan.attempt)
       timeAfter <- Stream.eval(IO.realTimeInstant)
       duration = FiniteDuration(timeAfter.toEpochMilli - timeBefore.toEpochMilli, TimeUnit.MILLISECONDS)
       _ <- Stream.eval(adaptiveIntervalMultiplier.map { adaptiveIntervalMultiplier =>
         val delay: Long = (duration.toMillis * adaptiveIntervalMultiplier).toLong
         delayUntilRef.set(Some(timeBefore.plusMillis(delay)))
       }.sequence)
-      result <- Stream.fromOption(resultOrError.toOption).flatMap(Stream.chunk)
+      result <- Stream.fromOption(resultOrError.toOption)
     } yield
       result
   }
@@ -109,16 +118,22 @@ object DirectoryObserver {
                                )
 
   case class DirStatsKey(
+                          path: Path,
                           empty: Boolean,
                           hidden: Boolean
                         )
 
   object DirStatsKey {
-    val default: DirStatsKey = DirStatsKey(empty = false, hidden = false)
+    def default(dirPath: Path): DirStatsKey = DirStatsKey(
+      path = dirPath,
+      empty = false,
+      hidden = false
+    )
 
-    def fromFileStats(path: Path, fileStats: FileStats): DirStatsKey = DirStatsKey(
+    def fromFileStats(filePath: Path, fileStats: FileStats): DirStatsKey = DirStatsKey(
+      path = filePath.parent.get,
       empty = fileStats.size == 0,
-      hidden = path.fileName.toString.startsWith(".")
+      hidden = filePath.fileName.toString.startsWith(".")
     )
   }
 
