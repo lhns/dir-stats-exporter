@@ -25,14 +25,16 @@ class DirectoryObserver(dirConfig: DirConfig) {
         .pipe(stream =>
           if (
             dirConfig.includeOrDefault.isEmpty &&
-              dirConfig.excludeOrDefault.isEmpty
+              dirConfig.excludeOrDefault.isEmpty &&
+              dirConfig.excludePathOrDefault.isEmpty
           )
             stream
           else
             stream.filter { file =>
               val fileName = file.fileName.toString
               (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
-                !dirConfig.excludeOrDefault.exists(fileName.matches)
+                !dirConfig.excludeOrDefault.exists(fileName.matches) &&
+                !dirConfig.excludePathOrDefault.exists(file.toString.matches)
             }
         )
         .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
