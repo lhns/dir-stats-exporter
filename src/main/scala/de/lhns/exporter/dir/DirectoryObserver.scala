@@ -19,11 +19,14 @@ class DirectoryObserver(dirConfig: DirConfig) {
 
   private val emptyGroupIO = IO.pure(Map.empty[DirStatsKey, DirStats])
 
-  private def scanPath(dirConfig: DirConfig): IO[Seq[DirStatsCollection]] =
+  private def scanPath(dirConfig: DirConfig, depth: Int): IO[Seq[DirStatsCollection]] =
     Ref.of[IO, Seq[DirStatsCollection]](Seq.empty).flatMap { childStatCollectionsRef =>
       val collectGroups: IO[Map[DirStatsKey, DirStats]] = Files[IO].list(dirConfig.path)
         .pipe(stream =>
-          if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
+          if (
+            dirConfig.includeOrDefault.isEmpty &&
+              dirConfig.excludeOrDefault.isEmpty
+          )
             stream
           else
             stream.filter { file =>
@@ -37,7 +40,10 @@ class DirectoryObserver(dirConfig: DirConfig) {
             .attempt
             .flatMap(e => Stream.fromOption(e.toOption))
             .evalMap { attributes =>
-              if (attributes.isRegularFile) {
+              if (
+                attributes.isRegularFile &&
+                  dirConfig.minDepth.forall(depth >= _)
+              ) {
                 val fileStats = FileStats(
                   name = path.fileName.toString,
                   modified = finiteDurationToInstant(attributes.lastModifiedTime),
@@ -51,8 +57,12 @@ class DirectoryObserver(dirConfig: DirConfig) {
                     fileStats = fileStats
                   )
                 ))
-              } else if (dirConfig.recursiveOrDefault) {
-                scanPath(dirConfig.withPath(path))
+              } else if (
+                attributes.isDirectory &&
+                  dirConfig.recursiveOrDefault &&
+                  dirConfig.maxDepth.forall(depth < _)
+              ) {
+                scanPath(dirConfig.withPath(path), depth + 1)
                   .flatMap { childStatCollections =>
                     childStatCollectionsRef.update(_ ++ childStatCollections)
                   }
@@ -84,7 +94,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
     }
 
   private def scan: IO[Seq[DirStatsCollection]] =
-    scanPath(dirConfig)
+    scanPath(dirConfig, 0)
 
   def observe(
                interval: FiniteDuration,

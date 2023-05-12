@@ -34,7 +34,9 @@ object Config {
                         adaptiveIntervalMultiplier: Option[Double],
                         tags: Option[Map[String, String]],
                         include: Option[Seq[String]],
-                        exclude: Option[Seq[String]]
+                        exclude: Option[Seq[String]],
+                        minDepth: Option[Int],
+                        maxDepth: Option[Int],
                       ) {
     val recursiveOrDefault: Boolean = recursive.getOrElse(false)
 
