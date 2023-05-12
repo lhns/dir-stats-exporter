@@ -25,16 +25,14 @@ class DirectoryObserver(dirConfig: DirConfig) {
         .pipe(stream =>
           if (
             dirConfig.includeOrDefault.isEmpty &&
-              dirConfig.excludeOrDefault.isEmpty &&
-              dirConfig.excludePathOrDefault.isEmpty
+              dirConfig.excludeOrDefault.isEmpty
           )
             stream
           else
             stream.filter { file =>
               val fileName = file.fileName.toString
               (dirConfig.includeOrDefault.isEmpty || dirConfig.includeOrDefault.exists(fileName.matches)) &&
-                !dirConfig.excludeOrDefault.exists(fileName.matches) &&
-                !dirConfig.excludePathOrDefault.exists(file.toString.matches)
+                !dirConfig.excludeOrDefault.exists(fileName.matches)
             }
         )
         .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
@@ -62,7 +60,8 @@ class DirectoryObserver(dirConfig: DirConfig) {
               } else if (
                 attributes.isDirectory &&
                   dirConfig.recursiveOrDefault &&
-                  dirConfig.maxDepth.forall(depth < _)
+                  dirConfig.maxDepth.forall(depth < _) &&
+                  !dirConfig.excludeDirPathOrDefault.exists(path.toString.matches)
               ) {
                 scanPath(dirConfig.withPath(path), depth + 1)
                   .flatMap { childStatCollections =>

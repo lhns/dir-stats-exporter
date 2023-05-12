@@ -35,7 +35,7 @@ object Config {
                         tags: Option[Map[String, String]],
                         include: Option[Seq[String]],
                         exclude: Option[Seq[String]],
-                        excludePath: Option[Seq[String]],
+                        excludeDirPath: Option[Seq[String]],
                         minDepth: Option[Int],
                         maxDepth: Option[Int],
                       ) {
@@ -53,7 +53,7 @@ object Config {
 
     val excludeOrDefault: Seq[String] = exclude.orEmpty
 
-    val excludePathOrDefault: Seq[String] = excludePath.orEmpty
+    val excludeDirPathOrDefault: Seq[String] = excludeDirPath.orEmpty
 
     def withPath(path: Path): DirConfig = copy(path = path)
   }
