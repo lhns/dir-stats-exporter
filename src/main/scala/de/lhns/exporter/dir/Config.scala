@@ -45,7 +45,7 @@ object Config {
       interval.getOrElse(config.interval)
 
     def adaptiveIntervalMultiplierOrDefault(config: Config): Option[Double] =
-      adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier)
+      adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier).filterNot(_ == 0)
 
     val tagsOrDefault: Map[String, String] = tags.orEmpty
 
