@@ -17,8 +17,6 @@ class DirectoryObserver(dirConfig: DirConfig) {
   private def finiteDurationToInstant(finiteDuration: FiniteDuration): Instant =
     Instant.ofEpochMilli(finiteDuration.toMillis)
 
-  private val emptyGroupIO = IO.pure(Map.empty[DirStatsKey, DirStats])
-
   private def scanPath(dirConfig: DirConfig, depth: Int): IO[Seq[DirStatsCollection]] =
     Ref.of[IO, Seq[DirStatsCollection]](Seq.empty).flatMap { childStatCollectionsRef =>
       val collectGroups: IO[Map[DirStatsKey, DirStats]] = Files[IO].list(dirConfig.path)
@@ -35,21 +33,28 @@ class DirectoryObserver(dirConfig: DirConfig) {
                 !dirConfig.excludeOrDefault.exists(fileName.matches)
             }
         )
-        .map[Stream[IO, Map[DirStatsKey, DirStats]]] { path =>
+        .flatMap[IO, Stream[IO, Map[DirStatsKey, DirStats]]] { path =>
           Stream.eval(Files[IO].getBasicFileAttributes(path))
             .attempt
             .flatMap(e => Stream.fromOption(e.toOption))
-            .evalMap { attributes =>
-              if (
+            .map { attributes =>
+              def shouldScanFile =
                 attributes.isRegularFile &&
                   dirConfig.minDepth.forall(depth >= _)
-              ) {
+
+              def shouldScanDirectory =
+                attributes.isDirectory &&
+                  dirConfig.recursiveOrDefault &&
+                  dirConfig.maxDepth.forall(depth < _) &&
+                  !dirConfig.excludeDirPathOrDefault.exists(path.toString.matches)
+
+              if (shouldScanFile) {
                 val fileStats = FileStats(
                   name = path.fileName.toString,
                   modified = finiteDurationToInstant(attributes.lastModifiedTime),
                   size = attributes.size
                 )
-                IO.pure(Map(
+                Stream.emit(Map(
                   DirStatsKey.fromFileStats(
                     filePath = path,
                     fileStats = fileStats
@@ -57,19 +62,15 @@ class DirectoryObserver(dirConfig: DirConfig) {
                     fileStats = fileStats
                   )
                 ))
-              } else if (
-                attributes.isDirectory &&
-                  dirConfig.recursiveOrDefault &&
-                  dirConfig.maxDepth.forall(depth < _) &&
-                  !dirConfig.excludeDirPathOrDefault.exists(path.toString.matches)
-              ) {
-                scanPath(dirConfig.withPath(path), depth + 1)
-                  .flatMap { childStatCollections =>
-                    childStatCollectionsRef.update(_ ++ childStatCollections)
-                  }
-                  .flatMap(_ => emptyGroupIO)
+              } else if (shouldScanDirectory) {
+                Stream.exec {
+                  scanPath(dirConfig.withPath(path), depth + 1)
+                    .flatMap { childStatCollections =>
+                      childStatCollectionsRef.update(_ ++ childStatCollections)
+                    }
+                }
               } else {
-                emptyGroupIO
+                Stream.empty
               }
             }
         }
