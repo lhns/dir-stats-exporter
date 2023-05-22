@@ -35,7 +35,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
                 !dirConfig.excludeOrDefault.exists(fileName.matches)
             }
         )
-        .flatMap[IO, Map[DirStatsKey, DirStats]] { path =>
+        .map[Stream[IO, Map[DirStatsKey, DirStats]]] { path =>
           Stream.eval(Files[IO].getBasicFileAttributes(path))
             .attempt
             .flatMap(e => Stream.fromOption(e.toOption))
@@ -73,6 +73,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
               }
             }
         }
+        .parJoinUnbounded
         .append(Stream.emit(Map(
           DirStatsKey.default -> Monoid[DirStats].empty
         )))
