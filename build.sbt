@@ -1,15 +1,15 @@
-ThisBuild / scalaVersion := "2.13.10"
+ThisBuild / scalaVersion := "2.13.11"
 
 val V = new {
   val betterMonadicFor = "0.3.1"
   val circe = "0.14.5"
   val circeConfig = "0.10.0"
-  val http4s = "0.23.19"
+  val http4s = "0.23.23"
   val julToSlf4j = "2.0.7"
-  val logbackClassic = "1.4.7"
+  val logbackClassic = "1.4.9"
   val munit = "0.7.29"
   val munitTaglessFinal = "0.2.0"
-  val opentelemetry = "1.26.0"
+  val opentelemetry = "1.28.0"
 }
 
 lazy val commonSettings: Seq[Setting[_]] = Seq(
