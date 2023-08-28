@@ -74,7 +74,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
               }
             }
         }
-        .parJoinUnbounded
+        .parJoin(dirConfig.parallelismOrDefault)
         .append(Stream.emit(Map(
           DirStatsKey.default -> Monoid[DirStats].empty
         )))

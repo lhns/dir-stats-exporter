@@ -38,6 +38,7 @@ object Config {
                         excludeDirPath: Option[Seq[String]],
                         minDepth: Option[Int],
                         maxDepth: Option[Int],
+                        parallelism: Option[Int],
                       ) {
     val recursiveOrDefault: Boolean = recursive.getOrElse(false)
 
@@ -56,6 +57,8 @@ object Config {
     val excludeDirPathOrDefault: Seq[String] = excludeDirPath.orEmpty
 
     def withPath(path: Path): DirConfig = copy(path = path)
+
+    val parallelismOrDefault: Int = parallelism.getOrElse(8)
   }
 
   object DirConfig {
