@@ -5,6 +5,7 @@ import cats.effect.Sync
 import cats.effect.std.Env
 import cats.syntax.option._
 import de.lhns.exporter.dir.Config.DirConfig
+import de.lhns.exporter.dir.Config.DirConfig.TagValue
 import fs2.io.file.Path
 import io.circe.generic.semiauto._
 import io.circe.{Codec, Decoder, Encoder}
@@ -32,7 +33,7 @@ object Config {
                         recursive: Option[Boolean],
                         interval: Option[FiniteDuration],
                         adaptiveIntervalMultiplier: Option[Double],
-                        tags: Option[Map[String, String]],
+                        tags: Option[Map[String, TagValue]],
                         include: Option[Seq[String]],
                         exclude: Option[Seq[String]],
                         excludeDirPath: Option[Seq[String]],
@@ -48,7 +49,7 @@ object Config {
     def adaptiveIntervalMultiplierOrDefault(config: Config): Option[Double] =
       adaptiveIntervalMultiplier.orElse(config.adaptiveIntervalMultiplier).filterNot(_ == 0)
 
-    val tagsOrDefault: Map[String, String] = tags.orEmpty
+    val tagsOrDefault: Map[String, TagValue] = tags.getOrElse(Map.empty)
 
     val includeOrDefault: Seq[String] = include.orEmpty
 
@@ -63,6 +64,18 @@ object Config {
 
   object DirConfig {
     implicit val codec: Codec[DirConfig] = deriveCodec
+
+    case class TagValue(value: String)
+
+    object TagValue {
+      implicit val codec: Codec[TagValue] = Codec.from(
+        Decoder.decodeString
+          .or(Decoder.decodeBoolean.map(_.toString))
+          .or(Decoder.decodeJsonNumber.map(_.toString))
+          .map(TagValue(_)),
+        Encoder.encodeString.contramap(_.value)
+      )
+    }
   }
 
   private implicit val pathCodec: Codec[Path] = Codec.from(

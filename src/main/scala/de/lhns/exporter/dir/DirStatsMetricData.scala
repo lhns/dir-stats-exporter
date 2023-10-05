@@ -1,5 +1,6 @@
 package de.lhns.exporter.dir
 
+import de.lhns.exporter.dir.Config.DirConfig.TagValue
 import de.lhns.exporter.dir.DirectoryObserver.DirStatsCollection
 import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.sdk.metrics.data.MetricData
@@ -30,7 +31,7 @@ class DirStatsMetricData(jobName: String, prefix: String) {
     val attributes = dirStatsCollection.dirConfig.tagsOrDefault.foldLeft(
       Attributes.builder()
         .put("path", dirStatsCollection.dirConfig.path.toString)
-    ) { case (builder, (key, value)) =>
+    ) { case (builder, (key, TagValue(value))) =>
       builder.put(key, value)
     }.build()
 
