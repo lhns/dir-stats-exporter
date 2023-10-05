@@ -2,14 +2,14 @@ package de.lhns.exporter.dir
 
 import de.lhns.exporter.dir.Config.DirConfig.TagValue
 import de.lhns.exporter.dir.DirectoryObserver.DirStatsCollection
-import io.opentelemetry.api.common.Attributes
+import io.opentelemetry.api.common.{AttributeKey, Attributes}
 import io.opentelemetry.sdk.metrics.data.MetricData
 import io.opentelemetry.sdk.resources.Resource
-import io.opentelemetry.semconv.resource.attributes.ResourceAttributes.SERVICE_NAME
 
 import java.time.temporal.ChronoUnit
 
 class DirStatsMetricData(jobName: String, prefix: String) {
+  private val SERVICE_NAME = AttributeKey.stringKey("service.name")
   private val resource = Resource.getDefault.merge(Resource.create(Attributes.of(SERVICE_NAME, jobName)))
 
   private val gaugeDurationSeconds = Gauge(resource, name = s"${prefix}_duration_seconds", unit = Some(Gauge.unitSeconds))
