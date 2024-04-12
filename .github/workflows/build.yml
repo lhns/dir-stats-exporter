@@ -74,6 +74,9 @@ jobs:
           for TAG in "${TAGS[@]}"; do docker push "$IMAGE_ID:$TAG"; done
   dependency-graph:
     name: Update Dependency Graph
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    if: ${{ env.GITHUB_TOKEN }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
