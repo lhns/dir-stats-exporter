@@ -36,6 +36,7 @@ object Config {
                         tags: Option[Map[String, TagValue]],
                         include: Option[Seq[String]],
                         exclude: Option[Seq[String]],
+                        includeDirPath: Option[Seq[String]],
                         excludeDirPath: Option[Seq[String]],
                         minDepth: Option[Int],
                         maxDepth: Option[Int],
@@ -54,6 +55,8 @@ object Config {
     val includeOrDefault: Seq[String] = include.orEmpty
 
     val excludeOrDefault: Seq[String] = exclude.orEmpty
+
+    val includeDirPathOrDefault: Seq[String] = includeDirPath.orEmpty
 
     val excludeDirPathOrDefault: Seq[String] = excludeDirPath.orEmpty
 

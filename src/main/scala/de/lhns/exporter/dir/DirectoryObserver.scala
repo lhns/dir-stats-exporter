@@ -46,6 +46,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
                 attributes.isDirectory &&
                   dirConfig.recursiveOrDefault &&
                   dirConfig.maxDepth.forall(depth < _) &&
+                  (dirConfig.includeDirPathOrDefault.isEmpty || dirConfig.includeDirPathOrDefault.exists(path.toString.matches)) &&
                   !dirConfig.excludeDirPathOrDefault.exists(path.toString.matches)
 
               if (shouldScanFile) {
