@@ -2,7 +2,7 @@ ThisBuild / scalaVersion := "2.13.13"
 
 val V = new {
   val betterMonadicFor = "0.3.1"
-  val circe = "0.14.6"
+  val circe = "0.14.7"
   val circeConfig = "0.10.0"
   val http4s = "0.23.26"
   val julToSlf4j = "2.0.12"
