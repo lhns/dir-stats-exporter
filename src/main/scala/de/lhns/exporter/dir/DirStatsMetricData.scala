@@ -28,12 +28,14 @@ class DirStatsMetricData(jobName: String, prefix: String) {
     val startTimestamp = dirStatsCollection.collectionStart
     val timestamp = dirStatsCollection.collectionEnd
 
-    val attributes = dirStatsCollection.dirConfig.tagsOrDefault.foldLeft(
-      Attributes.builder()
-        .put("path", dirStatsCollection.dirConfig.path.toString)
-    ) { case (builder, (key, TagValue(value))) =>
-      builder.put(key, value)
-    }.build()
+    val attributes = dirStatsCollection.tagRule.map(_.tagsOrDefault)
+      .getOrElse(dirStatsCollection.dirConfig.tagsOrDefault)
+      .foldLeft(
+        Attributes.builder()
+          .put("path", dirStatsCollection.dirConfig.path.toString)
+      ) { case (builder, (key, TagValue(value))) =>
+        builder.put(key, value)
+      }.build()
 
     Seq(
       gaugeDurationSeconds.toMetricData(startTimestamp, timestamp, ChronoUnit.MILLIS.between(startTimestamp, timestamp) / 1000d, attributes),

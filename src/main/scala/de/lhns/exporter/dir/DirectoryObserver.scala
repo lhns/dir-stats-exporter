@@ -4,6 +4,7 @@ import cats.effect.{IO, Ref}
 import cats.kernel.Monoid
 import cats.syntax.traverse._
 import de.lhns.exporter.dir.Config.DirConfig
+import de.lhns.exporter.dir.Config.DirConfig.TagRule
 import de.lhns.exporter.dir.DirectoryObserver.{DirStats, DirStatsCollection, DirStatsKey, FileStats}
 import fs2.Stream
 import fs2.io.file.{Files, Path}
@@ -21,10 +22,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
     Ref.of[IO, Seq[DirStatsCollection]](Seq.empty).flatMap { childStatCollectionsRef =>
       val collectGroups: IO[Map[DirStatsKey, DirStats]] = Files[IO].list(dirConfig.path)
         .pipe(stream =>
-          if (
-            dirConfig.includeOrDefault.isEmpty &&
-              dirConfig.excludeOrDefault.isEmpty
-          )
+          if (dirConfig.includeOrDefault.isEmpty && dirConfig.excludeOrDefault.isEmpty)
             stream
           else
             stream.filter { file =>
@@ -88,8 +86,10 @@ class DirectoryObserver(dirConfig: DirConfig) {
         dirAttributes <- Files[IO].getBasicFileAttributes(dirConfig.path)
         collectionEnd <- IO.realTimeInstant
         childStatCollections <- childStatCollectionsRef.get
+        tagRule = dirConfig.tagRulesOrDefault.find(rule => rule.dirPath.exists(dirConfig.path.toString.matches))
       } yield DirStatsCollection(
         dirConfig = dirConfig,
+        tagRule = tagRule,
         collectionStart = collectionStart,
         collectionEnd = collectionEnd,
         modified = finiteDurationToInstant(dirAttributes.lastModifiedTime),
@@ -134,6 +134,7 @@ class DirectoryObserver(dirConfig: DirConfig) {
 object DirectoryObserver {
   case class DirStatsCollection(
                                  dirConfig: DirConfig,
+                                 tagRule: Option[TagRule],
                                  collectionStart: Instant,
                                  collectionEnd: Instant,
                                  modified: Instant,

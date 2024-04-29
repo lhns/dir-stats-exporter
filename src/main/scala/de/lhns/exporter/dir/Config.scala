@@ -5,7 +5,7 @@ import cats.effect.Sync
 import cats.effect.std.Env
 import cats.syntax.option._
 import de.lhns.exporter.dir.Config.DirConfig
-import de.lhns.exporter.dir.Config.DirConfig.TagValue
+import de.lhns.exporter.dir.Config.DirConfig.{TagRule, TagValue}
 import fs2.io.file.Path
 import io.circe.generic.semiauto._
 import io.circe.{Codec, Decoder, Encoder}
@@ -38,6 +38,7 @@ object Config {
                         exclude: Option[Seq[String]],
                         includeDirPath: Option[Seq[String]],
                         excludeDirPath: Option[Seq[String]],
+                        tagRules: Option[Seq[TagRule]],
                         minDepth: Option[Int],
                         maxDepth: Option[Int],
                         parallelism: Option[Int],
@@ -60,6 +61,8 @@ object Config {
 
     val excludeDirPathOrDefault: Seq[String] = excludeDirPath.orEmpty
 
+    val tagRulesOrDefault: Seq[TagRule] = tagRules.getOrElse(Seq.empty)
+
     def withPath(path: Path): DirConfig = copy(path = path)
 
     val parallelismOrDefault: Int = parallelism.getOrElse(8)
@@ -78,6 +81,17 @@ object Config {
           .map(TagValue(_)),
         Encoder.encodeString.contramap(_.value)
       )
+    }
+
+    case class TagRule(
+                        dirPath: Seq[String],
+                        tags: Option[Map[String, TagValue]]
+                      ) {
+      val tagsOrDefault: Map[String, TagValue] = tags.getOrElse(Map.empty)
+    }
+
+    object TagRule {
+      implicit val codec: Codec[TagRule] = deriveCodec
     }
   }
 
