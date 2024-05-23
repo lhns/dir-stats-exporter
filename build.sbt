@@ -7,7 +7,7 @@ val V = new {
   val http4s = "0.23.27"
   val julToSlf4j = "2.0.12"
   val logbackClassic = "1.5.6"
-  val munit = "0.7.29"
+  val munit = "1.0.0"
   val munitTaglessFinal = "0.2.0"
   val opentelemetry = "1.38.0"
 }
