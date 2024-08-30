@@ -44,7 +44,7 @@ object Main extends IOApp {
           .parJoinUnbounded
           .flatMap(Stream.emits)
           .flatMap { dirStatsCollection =>
-            Stream.emits(dirStatsMetricData.toMetricData(dirStatsCollection))
+            Stream.emits(dirStatsMetricData.toMetricData(dirStatsCollection, config.tagFormatOrDefault))
           }
           .groupWithin(8192, 1.seconds)
           .map { metricDataChunk =>

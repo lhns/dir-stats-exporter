@@ -18,11 +18,14 @@ case class Config(
                    interval: FiniteDuration,
                    adaptiveIntervalMultiplier: Option[Double],
                    directories: Seq[DirConfig],
-                   prefix: Option[String]
+                   prefix: Option[String],
+                   tagFormat: Option[Map[String, TagFormat]],
                  ) {
   val jobNameOrDefault: String = jobName.getOrElse("dir-stats-exporter")
 
   val prefixOrDefault: String = prefix.getOrElse("dir_stats")
+
+  val tagFormatOrDefault: Map[String, TagFormat] = tagFormat.getOrElse(Map.empty)
 }
 
 object Config {

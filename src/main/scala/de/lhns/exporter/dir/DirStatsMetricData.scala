@@ -24,12 +24,13 @@ class DirStatsMetricData(jobName: String, prefix: String) {
   private val gaugeNewestAgeSeconds = Gauge(resource, name = s"${prefix}_newest_age_seconds", unit = Some(Gauge.unitSeconds))
   private val gaugeNewestBytes = Gauge(resource, name = s"${prefix}_newest_bytes", unit = Some(Gauge.unitBytes))
 
-  def toMetricData(dirStatsCollection: DirStatsCollection): Seq[MetricData] = {
+  def toMetricData(dirStatsCollection: DirStatsCollection, tagFormat: Map[String, TagFormat]): Seq[MetricData] = {
     val startTimestamp = dirStatsCollection.collectionStart
     val timestamp = dirStatsCollection.collectionEnd
 
     val attributes = dirStatsCollection.tagRule.map(_.tagsOrDefault)
       .getOrElse(dirStatsCollection.dirConfig.tagsOrDefault)
+      .flatMap(kv => tagFormat.getOrElse(kv._1, TagFormat.Default).transform(kv))
       .foldLeft(
         Attributes.builder()
           .put("path", dirStatsCollection.dirConfig.path.toString)
