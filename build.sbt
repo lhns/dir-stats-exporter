@@ -1,4 +1,4 @@
-ThisBuild / scalaVersion := "2.13.14"
+ThisBuild / scalaVersion := "2.13.15"
 
 val V = new {
   val betterMonadicFor = "0.3.1"
